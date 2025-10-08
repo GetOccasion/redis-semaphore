@@ -111,11 +111,11 @@ class Redis
     def signal(token = 1)
       token ||= generate_unique_token
 
-      @redis.multi do |pipeline|
-        pipeline.hdel grabbed_key, token
-        pipeline.lpush available_key, token
+      @redis.multi do
+        @redis.hdel grabbed_key, token
+        @redis.lpush available_key, token
 
-        set_expiration_if_necessary(pipeline)
+        set_expiration_if_necessary
       end
     end
 
@@ -124,9 +124,9 @@ class Redis
     end
 
     def all_tokens
-      @redis.multi do |pipeline|
-        pipeline.lrange(available_key, 0, -1)
-        pipeline.hkeys(grabbed_key)
+      @redis.multi do
+        @redis.lrange(available_key, 0, -1)
+        @redis.hkeys(grabbed_key)
       end.flatten
     end
 
@@ -190,23 +190,23 @@ class Redis
     def create!
       @redis.expire(exists_key, 10)
 
-      @redis.multi do |pipeline|
-        pipeline.del(grabbed_key)
-        pipeline.del(available_key)
+      @redis.multi do
+        @redis.del(grabbed_key)
+        @redis.del(available_key)
         @resource_count.times do |index|
-          pipeline.rpush(available_key, index)
+          @redis.rpush(available_key, index)
         end
-        pipeline.set(version_key, API_VERSION)
-        pipeline.persist(exists_key)
+        @redis.set(version_key, API_VERSION)
+        @redis.persist(exists_key)
 
-        set_expiration_if_necessary(pipeline)
+        set_expiration_if_necessary
       end
     end
 
-    def set_expiration_if_necessary(pipeline = @redis)
+    def set_expiration_if_necessary
       if @expiration
         [available_key, exists_key, version_key].each do |key|
-          pipeline.expire(key, @expiration)
+          @redis.expire(key, @expiration)
         end
       end
     end
